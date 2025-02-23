@@ -24,24 +24,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation()
 
   useEffect(() => {
-    // Handle access token from URL hash
-    const handleHashParams = () => {
+    // Handle access token from URL hash or query params
+    const handleAuthParams = () => {
+      // Check URL hash first
       const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
       
-      if (accessToken && refreshToken) {
-        supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
+      // Check URL query params if tokens not in hash
+      const queryParams = new URLSearchParams(window.location.search);
+      const queryAccessToken = queryParams.get('access_token');
+      const queryRefreshToken = queryParams.get('refresh_token');
+      
+      if ((accessToken && refreshToken) || (queryAccessToken && queryRefreshToken)) {
+        // Set session with a more robust approach
+        const session = {
+          access_token: accessToken || queryAccessToken || '',
+          refresh_token: refreshToken || queryRefreshToken || '',
+          provider_token: null,
+          provider_refresh_token: null,
+          expires_at: Math.floor(Date.now() / 1000) + 3600 // Add expiration time (1 hour from now)
+        };
+        
+        supabase.auth.setSession(session).then(({ data, error }) => {
+          if (!error && data.session) {
+            setSession(data.session);
+            setUser(data.session.user);
+            // Clear the URL parameters without triggering a reload
+            window.history.replaceState(null, '', window.location.pathname);
+            // Redirect to app after successful session setup
+            setTimeout(() => setLocation('/app'), 100);
+          } else {
+            console.error('Error setting session:', error);
+            toast({
+              title: "Authentication Error",
+              description: "Failed to establish session. Please try again.",
+              variant: "destructive",
+            });
+          }
         });
-        // Clear the hash without triggering a reload
-        window.history.replaceState(null, '', window.location.pathname);
       }
     };
 
-    handleHashParams();
+    handleAuthParams();
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,11 +79,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Handle auth state changes
       if (session) {
-        setLocation('/app'); // Redirect to app after successful auth
+        // Ensure we have a valid session before redirecting
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        if (currentSession && !error) {
+          // Add a small delay to ensure session is properly set
+          setTimeout(() => {
+            setLocation('/app');
+          }, 100);
+        }
+      } else {
+        // If no session, redirect to auth page
+        setLocation('/auth');
       }
     });
 
@@ -113,7 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/app`, // Redirect to app page instead of callback
+          redirectTo: `${window.location.origin}/auth`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+            response_type: 'token',
+            scope: 'email profile'
+          }
         },
       })
       if (error) throw error

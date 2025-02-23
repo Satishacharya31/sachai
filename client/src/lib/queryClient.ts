@@ -20,18 +20,37 @@ export async function apiRequest(
 ): Promise<Response> {
   const authHeader = await getAuthHeader();
 
-  const res = await fetch(url, {
-    method,
-    headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
-      ...(authHeader ? { "Authorization": authHeader } : {}),
-    },
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        ...(data ? { "Content-Type": "application/json" } : {}),
+        ...(authHeader ? { "Authorization": authHeader } : {}),
+      },
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`API Request failed: ${res.status}`, {
+        url,
+        method,
+        errorText,
+        headers: res.headers
+      });
+      throw new Error(`${res.status}: ${errorText || res.statusText}`);
+    }
+
+    return res;
+  } catch (error) {
+    console.error('API Request error:', {
+      url,
+      method,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
