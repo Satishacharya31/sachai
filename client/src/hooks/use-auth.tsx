@@ -24,26 +24,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation()
 
   useEffect(() => {
+    // Handle access token from URL hash
+    const handleHashParams = () => {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+        // Clear the hash without triggering a reload
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    };
+
+    handleHashParams();
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-    })
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+      setSession(session);
+      setUser(session?.user ?? null);
       if (session) {
-        setLocation("/app") // Redirect to app after successful auth
+        setLocation('/app'); // Redirect to app after successful auth
       }
-    })
+    });
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => subscription.unsubscribe();
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
