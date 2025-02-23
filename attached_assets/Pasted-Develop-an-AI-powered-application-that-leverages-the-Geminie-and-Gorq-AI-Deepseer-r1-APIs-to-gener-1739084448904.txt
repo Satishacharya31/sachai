@@ -1,0 +1,41 @@
+Develop an AI-powered application that leverages the Geminie and Gorq AI (Deepseer‑r1) APIs to generate various types of content—such as blog posts, Facebook posts, and scripts—in a fully SEO-optimized and humanized manner (ensuring the content is indistinguishable from human-written text and bypasses detection by tools like GPTZero).
+
+Key Requirements:
+
+Content Generation:
+
+APIs: Integrate Geminie and Gorq AI (Deepseer‑r1) using provided API keys.
+Output: Automatically generate content for blogs, Facebook posts, scripts, etc.
+Quality: Ensure all generated content is SEO-optimized, fully humanized, and not easily detected by AI-content detection tools.
+User Interface:
+
+Dual-Pane Layout:
+Chat Window: For real-time interactions with the AI.
+Content Window: For displaying generated content.
+Adjustability: The screen should be split half-and-half with an adjustable width between the two windows.
+Content Window Features: Include a toggle option that allows users to switch between a preview mode and an edit mode for the generated content.
+Social Media & Blog Integration:
+
+Facebook & Blogger: Directly integrate with Facebook and Blogger to enable users to post content directly from the application with connect button which aotumatically ask permission to respective platform and acess.
+Posting Workflow: Ensure a seamless process for content review and posting.
+Database:
+
+Supabase: Utilize Supabase for managing the application’s backend data storage, including user data, generated content, and integration settings.
+Code Quality & Documentation:
+
+Maintainability: Write clean, modular, and well-documented code.
+Scalability: Design the architecture so that it can be easily expanded with additional features in the future.
+User Documentation: Provide detailed guides for installation, configuration, and usage.
+Implementation Outline:
+
+Step 1: Set up your project environment and initialize the frontend and backend.
+Step 2: Integrate the Geminie and Gorq AI (Deepseer‑r1) APIs to handle content generation.
+Step 3: Design the user interface with a responsive dual-pane layout:
+Implement the chat window for AI interactions.
+Implement the content window with adjustable width and toggle functionality (preview/edit).
+Step 4: Develop the integration modules for direct posting to Facebook and Blogger.
+Step 5: Configure Supabase as your database backend and integrate it with your application.
+Step 6: Test the full workflow—from content generation and editing to social posting—and optimize for SEO and human-like text generation.
+Step 7: Document all code and create a user guide for future maintenance and scalability.
+Final Deliverable:
+A fully functional, user-friendly web application that generates high-quality, SEO-optimized content using AI, features an intuitive chat-based interface with an adjustable split-screen layout, supports direct posting to Facebook and Blogger, and leverages Supabase for robust backend data management.
