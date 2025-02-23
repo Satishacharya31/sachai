@@ -24,66 +24,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation()
 
   useEffect(() => {
-    // Handle access token from URL hash or query params
-    const handleAuthParams = () => {
-      // Check URL hash first
-      const hash = window.location.hash.substring(1);
-      const hashParams = new URLSearchParams(hash);
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
+    // Handle OAuth callback and session restoration
+    const handleAuthCallback = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
       
-      // Check URL query params if tokens not in hash
-      const queryParams = new URLSearchParams(window.location.search);
-      const queryAccessToken = queryParams.get('access_token');
-      const queryRefreshToken = queryParams.get('refresh_token');
+      if (error) {
+        console.error('Error getting session:', error);
+        return;
+      }
       
-      if ((accessToken && refreshToken) || (queryAccessToken && queryRefreshToken)) {
-        // Set session with a more robust approach
-        const session = {
-          access_token: accessToken || queryAccessToken || '',
-          refresh_token: refreshToken || queryRefreshToken || '',
-          provider_token: null,
-          provider_refresh_token: null,
-          expires_at: Math.floor(Date.now() / 1000) + 3600 // Add expiration time (1 hour from now)
-        };
+      if (session) {
+        try {
+          // Try to refresh the session first
+          const { data: { session: refreshedSession }, error: refreshError } = 
+            await supabase.auth.refreshSession();
 
-        // Store session in localStorage for persistence
-        localStorage.setItem('supabase.auth.token', JSON.stringify(session));
-
-        // First try to refresh the session before setting it
-        supabase.auth.refreshSession().then(({ data: { session: refreshedSession }, error: refreshError }) => {
           if (!refreshError && refreshedSession) {
             setSession(refreshedSession);
             setUser(refreshedSession.user);
-            // Update stored session
             localStorage.setItem('supabase.auth.token', JSON.stringify(refreshedSession));
             window.history.replaceState(null, '', window.location.pathname);
-            setTimeout(() => setLocation('/app'), 100);
+            setLocation('/app');
           } else {
-            // If refresh fails, try setting the new session
-            supabase.auth.setSession(session).then(({ data, error }) => {
-              if (!error && data.session) {
-                setSession(data.session);
-                setUser(data.session.user);
-                // Update stored session
-                localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
-                window.history.replaceState(null, '', window.location.pathname);
-                setTimeout(() => setLocation('/app'), 100);
-              } else {
-                console.error('Error setting session:', error);
-                toast({
-                  title: "Authentication Error",
-                  description: "Failed to establish session. Please try again.",
-                  variant: "destructive",
-                });
-              }
-            });
+            // If refresh fails, try setting the current session
+            const { data, error: setError } = await supabase.auth.setSession(session);
+            if (!setError && data.session) {
+              setSession(data.session);
+              setUser(data.session.user);
+              localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
+              window.history.replaceState(null, '', window.location.pathname);
+              setLocation('/app');
+            } else {
+              console.error('Error setting session:', setError);
+              toast({
+                title: "Authentication Error",
+                description: "Failed to establish session. Please try again.",
+                variant: "destructive",
+              });
+            }
           }
-        });
+        } catch (err) {
+          console.error('Session handling error:', err);
+          toast({
+            title: "Authentication Error",
+            description: "An error occurred while establishing your session.",
+            variant: "destructive",
+          });
+        }
       }
     };
 
-    handleAuthParams();
+    handleAuthCallback();
 
     // Try to restore session from localStorage first
     const storedSession = localStorage.getItem('supabase.auth.token');
@@ -115,7 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -125,9 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Ensure we have a valid session before redirecting
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         if (currentSession && !error) {
-          setTimeout(() => {
-            setLocation('/app');
-          }, 100);
+          // Use immediate redirect for better UX
+          setLocation('/app');
+        } else {
+          console.error('Invalid session after auth state change:', error);
+          toast({
+            title: "Session Error",
+            description: "Failed to validate your session. Please try signing in again.",
+            variant: "destructive",
+          });
         }
       } else {
         // Clear stored session on logout
@@ -188,17 +186,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `${window.location.origin}/app`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            response_type: 'token',
+            response_type: 'code',
             scope: 'email profile'
           }
         },
       })
       if (error) throw error
     } catch (error) {
+      console.error('Google sign-in error:', error)
       toast({
         title: "Error signing in with Google",
         description: error instanceof Error ? error.message : "An error occurred",
