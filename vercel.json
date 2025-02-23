@@ -10,7 +10,7 @@
       "use": "@vercel/static-build",
       "config": {
         "buildCommand": "npm run build:client",
-        "distDir": "dist"
+        "distDir": "dist/public"
       }
     }
   ],
@@ -20,11 +20,8 @@
       "dest": "server/index.ts"
     },
     {
-      "handle": "filesystem"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "dist/public/index.html"
     }
   ],
   "env": {
