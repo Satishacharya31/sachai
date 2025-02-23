@@ -47,20 +47,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           expires_at: Math.floor(Date.now() / 1000) + 3600 // Add expiration time (1 hour from now)
         };
         
-        supabase.auth.setSession(session).then(({ data, error }) => {
-          if (!error && data.session) {
-            setSession(data.session);
-            setUser(data.session.user);
-            // Clear the URL parameters without triggering a reload
+        // First try to refresh the session before setting it
+        supabase.auth.refreshSession().then(({ data: { session: refreshedSession }, error: refreshError }) => {
+          if (!refreshError && refreshedSession) {
+            setSession(refreshedSession);
+            setUser(refreshedSession.user);
             window.history.replaceState(null, '', window.location.pathname);
-            // Redirect to app after successful session setup
             setTimeout(() => setLocation('/app'), 100);
           } else {
-            console.error('Error setting session:', error);
-            toast({
-              title: "Authentication Error",
-              description: "Failed to establish session. Please try again.",
-              variant: "destructive",
+            // If refresh fails, try setting the new session
+            supabase.auth.setSession(session).then(({ data, error }) => {
+              if (!error && data.session) {
+                setSession(data.session);
+                setUser(data.session.user);
+                window.history.replaceState(null, '', window.location.pathname);
+                setTimeout(() => setLocation('/app'), 100);
+              } else {
+                console.error('Error setting session:', error);
+                toast({
+                  title: "Authentication Error",
+                  description: "Failed to establish session. Please try again.",
+                  variant: "destructive",
+                });
+              }
             });
           }
         });

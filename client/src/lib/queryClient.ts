@@ -10,7 +10,18 @@ async function throwIfResNotOk(res: Response) {
 
 async function getAuthHeader() {
   const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ? `Bearer ${session.access_token}` : '';
+  
+  // If no session, try to refresh
+  if (!session?.access_token) {
+    const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.error('Session refresh failed:', error);
+      return '';
+    }
+    return refreshedSession?.access_token ? `Bearer ${refreshedSession.access_token}` : '';
+  }
+  
+  return `Bearer ${session.access_token}`;
 }
 
 export async function apiRequest(
@@ -18,7 +29,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const authHeader = await getAuthHeader();
+  let authHeader = await getAuthHeader();
 
   try {
     const res = await fetch(url, {
@@ -30,6 +41,25 @@ export async function apiRequest(
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
     });
+
+    // If unauthorized, try refreshing the session once
+    if (res.status === 401) {
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      if (!error && session) {
+        authHeader = `Bearer ${session.access_token}`;
+        // Retry the request with new token
+        const retryRes = await fetch(url, {
+          method,
+          headers: {
+            ...(data ? { "Content-Type": "application/json" } : {}),
+            "Authorization": authHeader,
+          },
+          body: data ? JSON.stringify(data) : undefined,
+          credentials: "include",
+        });
+        return retryRes;
+      }
+    }
 
     if (!res.ok) {
       const errorText = await res.text();
