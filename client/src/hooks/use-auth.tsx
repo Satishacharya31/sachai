@@ -46,12 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           provider_refresh_token: null,
           expires_at: Math.floor(Date.now() / 1000) + 3600 // Add expiration time (1 hour from now)
         };
-        
+
+        // Store session in localStorage for persistence
+        localStorage.setItem('supabase.auth.token', JSON.stringify(session));
+
         // First try to refresh the session before setting it
         supabase.auth.refreshSession().then(({ data: { session: refreshedSession }, error: refreshError }) => {
           if (!refreshError && refreshedSession) {
             setSession(refreshedSession);
             setUser(refreshedSession.user);
+            // Update stored session
+            localStorage.setItem('supabase.auth.token', JSON.stringify(refreshedSession));
             window.history.replaceState(null, '', window.location.pathname);
             setTimeout(() => setLocation('/app'), 100);
           } else {
@@ -60,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (!error && data.session) {
                 setSession(data.session);
                 setUser(data.session.user);
+                // Update stored session
+                localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
                 window.history.replaceState(null, '', window.location.pathname);
                 setTimeout(() => setLocation('/app'), 100);
               } else {
@@ -78,10 +85,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     handleAuthParams();
 
+    // Try to restore session from localStorage first
+    const storedSession = localStorage.getItem('supabase.auth.token');
+    if (storedSession) {
+      try {
+        const parsedSession = JSON.parse(storedSession);
+        supabase.auth.setSession(parsedSession).then(({ data, error }) => {
+          if (!error && data.session) {
+            setSession(data.session);
+            setUser(data.session.user);
+          }
+        });
+      } catch (error) {
+        console.error('Error restoring session:', error);
+      }
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        // Update stored session
+        localStorage.setItem('supabase.auth.token', JSON.stringify(session));
+      }
       setIsLoading(false);
     });
 
@@ -92,18 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       
-      // Handle auth state changes
       if (session) {
+        // Update stored session
+        localStorage.setItem('supabase.auth.token', JSON.stringify(session));
         // Ensure we have a valid session before redirecting
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         if (currentSession && !error) {
-          // Add a small delay to ensure session is properly set
           setTimeout(() => {
             setLocation('/app');
           }, 100);
         }
       } else {
-        // If no session, redirect to auth page
+        // Clear stored session on logout
+        localStorage.removeItem('supabase.auth.token');
         setLocation('/auth');
       }
     });
