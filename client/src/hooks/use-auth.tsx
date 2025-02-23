@@ -24,14 +24,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation()
 
   useEffect(() => {
+    let mounted = true;
     // Handle OAuth callback and session restoration
     const handleAuthCallback = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error getting session:', error);
-        return;
-      }
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          toast({
+            title: "Session Error",
+            description: "Failed to retrieve your session. Please try signing in again.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
       
       if (session) {
         try {
@@ -72,23 +82,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         }
       }
-    };
+    } catch (err) {
+      console.error('Auth callback error:', err);
+      toast({
+        title: "Authentication Error",
+        description: "An error occurred during authentication.",
+        variant: "destructive",
+      });
+    } finally {
+      if (mounted) {
+        setIsLoading(false);
+      }
+    }
+  };
 
     handleAuthCallback();
 
-    // Try to restore session from localStorage first
+    // Try to restore session from localStorage first with timeout
     const storedSession = localStorage.getItem('supabase.auth.token');
     if (storedSession) {
       try {
         const parsedSession = JSON.parse(storedSession);
-        supabase.auth.setSession(parsedSession).then(({ data, error }) => {
-          if (!error && data.session) {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session restore timeout')), 5000)
+        );
+        
+        Promise.race([
+          supabase.auth.setSession(parsedSession),
+          timeoutPromise
+        ]).then(({ data, error }) => {
+          if (mounted && !error && data?.session) {
             setSession(data.session);
             setUser(data.session.user);
           }
+        }).catch(error => {
+          console.error('Error restoring session:', error);
+          if (mounted) {
+            localStorage.removeItem('supabase.auth.token');
+          }
         });
       } catch (error) {
-        console.error('Error restoring session:', error);
+        console.error('Error parsing stored session:', error);
+        localStorage.removeItem('supabase.auth.token');
       }
     }
 
@@ -134,7 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
