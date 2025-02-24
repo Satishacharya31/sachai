@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { WebSocket, WebSocketServer } from 'ws';
 
 const app = express();
 app.use(express.json());
@@ -52,22 +53,73 @@ app.use((req, res, next) => {
 (async () => {
   const server = registerRoutes(app);
 
+  // Initialize WebSocket server
+  const wss = new WebSocketServer({ server });
+
+  wss.on('connection', (ws: WebSocket) => {
+    log('New WebSocket connection established');
+
+    // Set up ping interval
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+      }
+    }, 30000); // Send ping every 30 seconds
+
+    ws.on('pong', () => {
+      // Client responded to ping
+      (ws as any).isAlive = true;
+    });
+
+    ws.on('error', (error) => {
+      log(`WebSocket error: ${error.message}`);
+    });
+
+    ws.on('close', () => {
+      clearInterval(pingInterval);
+      log('Client disconnected');
+    });
+  });
+
   // Enhanced error handling middleware
   app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     console.error('Error:', err);
     
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    const errorDetails = process.env.NODE_ENV === 'development' ? err.stack : undefined;
+    let status = err.status || err.statusCode || 500;
+    let message = err.message || "Internal Server Error";
 
-    res.status(status).json({
+    // Check for specific error types
+    if (err.message?.includes('not configured') || err.message?.includes('API key')) {
+      status = 500;
+      message = 'Server configuration error: Required API keys are missing. Please check environment variables.';
+    } else if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+      status = 503;
+      message = 'Service temporarily unavailable. Please try again later.';
+    }
+
+    // Add request information for better debugging
+    const requestInfo = {
+      path: req.path,
+      method: req.method,
+      query: req.query,
+      timestamp: new Date().toISOString(),
+      requestId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+
+    const errorResponse = {
       error: {
         message,
         status,
-        details: errorDetails,
-        requestId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        request: requestInfo
       }
-    });
+    };
+
+    // Only include error details in development
+    if (process.env.NODE_ENV === 'development') {
+      (errorResponse.error as any).details = err.stack;
+    }
+
+    res.status(status).json(errorResponse);
   });
 
   if (app.get("env") === "development") {
