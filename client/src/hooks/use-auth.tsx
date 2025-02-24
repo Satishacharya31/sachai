@@ -28,6 +28,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function initializeAuth() {
       try {
+        // Get the stored session first
+        const storedSession = localStorage.getItem('supabase.auth.token');
+        const parsedSession = storedSession ? JSON.parse(storedSession) : null;
+
+        // If we have a stored session, try to use it first
+        if (parsedSession) {
+          try {
+            const { data, error: setError } = await supabase.auth.setSession(parsedSession);
+            if (!setError && data.session) {
+              setSession(data.session);
+              setUser(data.session.user);
+              if (window.location.pathname === '/auth') {
+                setLocation('/app');
+              }
+              setIsLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.error('Error setting stored session:', err);
+            localStorage.removeItem('supabase.auth.token');
+          }
+        }
+
+        // If no stored session or it failed, get a new session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
@@ -35,71 +59,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) {
           console.error('Error getting session:', error);
           localStorage.removeItem('supabase.auth.token');
-          toast({
-            title: "Authentication Error",
-            description: "Failed to retrieve your session. Please try signing in again.",
-            variant: "destructive",
-          });
-          setLocation('/auth');
+          if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+            setLocation('/auth');
+          }
           setIsLoading(false);
           return;
         }
         
         if (session) {
-          try {
-            // Try to refresh the session first
-            const { data: { session: refreshedSession }, error: refreshError } = 
-              await supabase.auth.refreshSession();
-
-            if (!refreshError && refreshedSession) {
-              setSession(refreshedSession);
-              setUser(refreshedSession.user);
-              localStorage.setItem('supabase.auth.token', JSON.stringify(refreshedSession));
-              if (window.location.pathname === '/auth') {
-                setLocation('/app');
-              }
-            } else {
-              // If refresh fails, try setting the current session
-              const { data, error: setError } = await supabase.auth.setSession(session);
-              if (!setError && data.session) {
-                setSession(data.session);
-                setUser(data.session.user);
-                localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
-                if (window.location.pathname === '/auth') {
-                  setLocation('/app');
-                }
-              } else {
-                console.error('Error setting session:', setError);
-                toast({
-                  title: "Session Error",
-                  description: "Failed to establish session. Please try again.",
-                  variant: "destructive",
-                });
-                setLocation('/auth');
-              }
-            }
-          } catch (err) {
-            console.error('Session handling error:', err);
-            toast({
-              title: "Session Error",
-              description: "An error occurred while managing your session.",
-              variant: "destructive",
-            });
-            setLocation('/auth');
+          setSession(session);
+          setUser(session.user);
+          localStorage.setItem('supabase.auth.token', JSON.stringify(session));
+          if (window.location.pathname === '/auth') {
+            setLocation('/app');
           }
-        } else {
-          if (window.location.pathname !== '/auth') {
-            setLocation('/auth');
-          }
+        } else if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+          setLocation('/auth');
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
-        toast({
-          title: "Authentication Error",
-          description: "An error occurred during authentication.",
-          variant: "destructive",
-        });
-        setLocation('/auth');
+        if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+          setLocation('/auth');
+        }
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -112,64 +93,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
     
-      console.log('Auth state changed:', event, session);
-      
       if (event === 'SIGNED_OUT' || !session) {
         setSession(null);
         setUser(null);
         localStorage.removeItem('supabase.auth.token');
-        if (window.location.pathname !== '/auth') {
+        if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
           setLocation('/auth');
         }
         return;
       }
       
-      try {
-        // Try to refresh the session first
-        const { data: { session: refreshedSession }, error: refreshError } = 
-          await supabase.auth.refreshSession();
-
-        if (!refreshError && refreshedSession) {
-          setSession(refreshedSession);
-          setUser(refreshedSession.user);
-          localStorage.setItem('supabase.auth.token', JSON.stringify(refreshedSession));
-          if (window.location.pathname === '/auth') {
-            setLocation('/app');
-          }
-        } else {
-          // If refresh fails, try getting the current session
-          const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-          if (currentSession && !error) {
-            setSession(currentSession);
-            setUser(currentSession.user);
-            localStorage.setItem('supabase.auth.token', JSON.stringify(currentSession));
-            if (window.location.pathname === '/auth') {
-              setLocation('/app');
-            }
-          } else {
-            console.error('Invalid session after auth state change:', error);
-            setSession(null);
-            setUser(null);
-            localStorage.removeItem('supabase.auth.token');
-            toast({
-              title: "Session Error",
-              description: "Failed to validate your session. Please try signing in again.",
-              variant: "destructive",
-            });
-            setLocation('/auth');
-          }
-        }
-      } catch (error) {
-        console.error('Session handling error:', error);
-        setSession(null);
-        setUser(null);
-        localStorage.removeItem('supabase.auth.token');
-        toast({
-          title: "Session Error",
-          description: "An error occurred while managing your session.",
-          variant: "destructive",
-        });
-        setLocation('/auth');
+      setSession(session);
+      setUser(session.user);
+      localStorage.setItem('supabase.auth.token', JSON.stringify(session));
+      if (window.location.pathname === '/auth') {
+        setLocation('/app');
       }
     });
   
