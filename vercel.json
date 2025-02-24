@@ -9,7 +9,7 @@
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "npm run build:client",
+        "buildCommand": "npm run build",
         "distDir": "dist/public"
       }
     }
@@ -17,11 +17,21 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server/index.ts"
+      "dest": "server/index.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,PUT,POST,DELETE",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
     },
     {
       "src": "/auth/(.*)",
-      "dest": "server/index.ts"
+      "dest": "server/index.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,PUT,POST,DELETE",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
     },
     {
       "src": "/callback",
@@ -37,12 +47,17 @@
     },
     {
       "src": "/(.*)",
+      "headers": { "cache-control": "s-maxage=1, stale-while-revalidate" },
       "dest": "dist/public/index.html"
     }
   ],
   "env": {
     "NODE_ENV": "production",
     "VITE_SUPABASE_URL": "${VITE_SUPABASE_URL}",
-    "VITE_SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}"
+    "VITE_SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}",
+    "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+    "GROQ_API_KEY": "${GROQ_API_KEY}",
+    "SUPABASE_URL": "${SUPABASE_URL}",
+    "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}"
   }
 }

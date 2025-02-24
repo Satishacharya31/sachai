@@ -33,7 +33,7 @@ export function ContentWindow({ content, onContentChange }: ContentWindowProps) 
     }
 
     const htmlContent = marked(content);
-    const sanitizedHtml = DOMPurify.sanitize(htmlContent);
+    const sanitizedHtml = DOMPurify.sanitize(htmlContent, { USE_PROFILES: { html: true } });
 
     return (
       <div 
@@ -79,6 +79,7 @@ export function ContentWindow({ content, onContentChange }: ContentWindowProps) 
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
             placeholder="Edit your content here..."
+            
             aria-label="Content editor"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           />
