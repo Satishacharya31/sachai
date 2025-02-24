@@ -107,15 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => reject(new Error('Session restore timeout')), 5000)
         );
         
-        Promise.race([
-          supabase.auth.setSession(parsedSession),
-          timeoutPromise
+        Promise.race<{ data: { session: Session | null }; error: Error | null }>([
+          supabase.auth.setSession(parsedSession) as Promise<{ data: { session: Session | null }; error: Error | null }>,
+          timeoutPromise.then(() => ({ data: { session: null }, error: new Error('Session restore timeout') }))
         ]).then(({ data, error }) => {
           if (mounted && !error && data?.session) {
             setSession(data.session);
             setUser(data.session.user);
           }
-        }).catch(error => {
+        }).catch((error: Error) => {
           console.error('Error restoring session:', error);
           if (mounted) {
             localStorage.removeItem('supabase.auth.token');
@@ -143,27 +143,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session);
-      setSession(session);
-      setUser(session?.user ?? null);
+      
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        localStorage.removeItem('supabase.auth.token');
+        setLocation('/auth');
+        return;
+      }
       
       if (session) {
-        // Update stored session
-        localStorage.setItem('supabase.auth.token', JSON.stringify(session));
-        // Ensure we have a valid session before redirecting
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-        if (currentSession && !error) {
-          // Use immediate redirect for better UX
-          setLocation('/app');
-        } else {
-          console.error('Invalid session after auth state change:', error);
+        try {
+          // Try to refresh the session first
+          const { data: { session: refreshedSession }, error: refreshError } = 
+            await supabase.auth.refreshSession();
+
+          if (!refreshError && refreshedSession) {
+            setSession(refreshedSession);
+            setUser(refreshedSession.user);
+            localStorage.setItem('supabase.auth.token', JSON.stringify(refreshedSession));
+            setLocation('/app');
+          } else {
+            // If refresh fails, try setting the current session
+            const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+            if (currentSession && !error) {
+              setSession(currentSession);
+              setUser(currentSession.user);
+              localStorage.setItem('supabase.auth.token', JSON.stringify(currentSession));
+              setLocation('/app');
+            } else {
+              console.error('Invalid session after auth state change:', error);
+              setSession(null);
+              setUser(null);
+              localStorage.removeItem('supabase.auth.token');
+              toast({
+                title: "Session Error",
+                description: "Failed to validate your session. Please try signing in again.",
+                variant: "destructive",
+              });
+              setLocation('/auth');
+            }
+          }
+        } catch (error) {
+          console.error('Session handling error:', error);
+          setSession(null);
+          setUser(null);
+          localStorage.removeItem('supabase.auth.token');
           toast({
             title: "Session Error",
-            description: "Failed to validate your session. Please try signing in again.",
+            description: "An error occurred while managing your session.",
             variant: "destructive",
           });
+          setLocation('/auth');
         }
       } else {
-        // Clear stored session on logout
+        setSession(null);
+        setUser(null);
         localStorage.removeItem('supabase.auth.token');
         setLocation('/auth');
       }

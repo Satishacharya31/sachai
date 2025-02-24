@@ -9,26 +9,43 @@ async function throwIfResNotOk(res: Response) {
 }
 
 async function getAuthHeader() {
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  // If no session, try to refresh
-  if (!session?.access_token) {
-    const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-    if (error) {
-      console.error('Session refresh failed:', error);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      // Try to refresh the session
+      const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('Session refresh failed:', error);
+        // Clear stored session on refresh failure
+        localStorage.removeItem('supabase.auth.token');
+        window.location.href = '/auth';
+        return '';
+      }
+      if (refreshedSession?.access_token) {
+        localStorage.setItem('supabase.auth.token', JSON.stringify(refreshedSession));
+        return `Bearer ${refreshedSession.access_token}`;
+      }
+      // No valid session after refresh, redirect to auth
+      window.location.href = '/auth';
       return '';
     }
-    return refreshedSession?.access_token ? `Bearer ${refreshedSession.access_token}` : '';
+    
+    return `Bearer ${session.access_token}`;
+  } catch (error) {
+    console.error('Auth header error:', error);
+    window.location.href = '/auth';
+    return '';
   }
-  
-  return `Bearer ${session.access_token}`;
 }
 
 const TIMEOUT_DURATION = 30000; // 30 seconds timeout
 
-async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit & { method?: string }): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), TIMEOUT_DURATION);
+  const MAX_RETRIES = 2;
+  let retryCount = 0;
 
   try {
     const response = await fetch(url, {
@@ -37,9 +54,28 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
     });
     clearTimeout(id);
     return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('Request timeout:', {
+        url,
+        method: options.method,
+        timeout: TIMEOUT_DURATION
+      });
+      throw new Error(`Request timeout after ${TIMEOUT_DURATION}ms`);
+    }
+
+    console.error('API Request error:', {
+      url,
+      method: options.method,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      attempt: retryCount + 1
+    });
+
+    if (retryCount === MAX_RETRIES) {
+      throw error;
+    }
+    retryCount++;
+    return fetchWithTimeout(url, options); // Add recursive retry
   }
 }
 
@@ -99,7 +135,7 @@ export async function apiRequest(
 
       return res;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if ((error as Error).name === 'AbortError') {
         console.error('Request timeout:', {
           url,
           method,
