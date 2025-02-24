@@ -59,7 +59,7 @@ export default function SettingsPage() {
 
   // Delete API key mutation
   const deleteApiKeyMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/settings/api-keys/${id}`);
     },
     onSuccess: () => {
@@ -73,7 +73,7 @@ export default function SettingsPage() {
 
   // Delete social connection mutation
   const deleteSocialConnectionMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/settings/social-connections/${id}`);
     },
     onSuccess: () => {
@@ -127,7 +127,6 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div>
                 <Label>Username</Label>
-                <Input value={user?.username} disabled />
               </div>
               <div>
                 <Label>Email</Label>
@@ -173,7 +172,7 @@ export default function SettingsPage() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => deleteSocialConnectionMutation.mutate(connection.id)}
+                          onClick={() => deleteSocialConnectionMutation.mutate(connection.id.toString())}
                           disabled={deleteSocialConnectionMutation.isPending}
                         >
                           Disconnect
@@ -247,7 +246,7 @@ export default function SettingsPage() {
                   <div>
                     <p className="font-medium capitalize">{key.provider}</p>
                     <p className="text-sm text-gray-500">
-                      Added on {new Date(key.createdAt).toLocaleDateString()}
+                      Added on {new Date(key.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <Button

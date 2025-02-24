@@ -73,7 +73,7 @@ export default function Home() {
       </header>
 
       <main className="flex-grow ">
-        <div className="h-[200vh] container mx-auto px-2 sm:px-4 py-3 sm:py-6">
+        <div className="h-[200vh] container mx-auto px-2 sm:px-4 py-3 sm:py-6 flex flec-col md:flex-row">
           <ResizablePanelGroup 
             direction="vertical"
             className="h-full rounded-xl overflow-hidden border shadow-lg bg-white/80 backdrop-blur-sm"

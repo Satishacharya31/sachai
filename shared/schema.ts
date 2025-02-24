@@ -28,6 +28,15 @@ export const apiKeySchema = z.object({
   created_at: z.string(),
 });
 
+// Schema for social media connections
+export const socialConnectionSchema = z.object({
+  id: z.number(),
+  provider: z.string(),
+  profileName: z.string(),
+  user_id: z.string().uuid(),
+  created_at: z.string(),
+});
+
 // Types for TypeScript
 export type InsertContent = z.infer<typeof insertContentSchema>;
 export type Content = InsertContent & {
@@ -38,3 +47,4 @@ export type Content = InsertContent & {
 };
 export type Profile = z.infer<typeof profileSchema>;
 export type ApiKey = z.infer<typeof apiKeySchema>;
+export type SocialConnection = z.infer<typeof socialConnectionSchema>;
