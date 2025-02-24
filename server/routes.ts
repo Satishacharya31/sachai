@@ -148,7 +148,7 @@ const generateWithGroq = async () => {
           }
         }
 
-        res.json({
+        return res.json({
           content,
           model: finalModel,
           message: finalModel !== model ? "Content was generated using a fallback model due to safety filters" : undefined

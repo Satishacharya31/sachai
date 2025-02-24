@@ -84,6 +84,11 @@ export async function generateContent(
       saveContent: options.saveContent
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to generate content: ${response.status} ${errorText}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
