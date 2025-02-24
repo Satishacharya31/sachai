@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from '@/components/ui/resizable';
 import { ChatWindow } from '@/components/chat-window';
 import { ContentWindow } from '@/components/content-window';
@@ -13,6 +13,16 @@ export default function Home() {
   const { content, updateContent, clearContent } = useContent();
   const { user, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isHorizontal, setIsHorizontal] = useState(window.innerWidth >= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsHorizontal(window.innerWidth >= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleSignOut = async () => {
     setIsLoading(true);
@@ -72,10 +82,10 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-grow ">
-        <div className="h-[200vh] container mx-auto px-2 sm:px-4 py-3 sm:py-6 flex flec-col md:flex-row">
+      <main className="flex-grow">
+        <div className="h-[200vh] md:h-[90vh] container mx-auto px-2 sm:px-4 py-3 sm:py-6 flex flex-col md:flex-row">
           <ResizablePanelGroup 
-            direction="vertical"
+            direction={isHorizontal ? "horizontal" : "vertical"}
             className="h-full rounded-xl overflow-hidden border shadow-lg bg-white/80 backdrop-blur-sm"
           >
             <ResizablePanel 

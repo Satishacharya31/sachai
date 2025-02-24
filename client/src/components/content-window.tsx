@@ -18,11 +18,16 @@ export function ContentWindow({ content, onContentChange }: ContentWindowProps) 
   const renderPreview = () => {
     if (!content) {
       return (
-        <div className="flex items-center justify-center h-full text-gray-500 italic p-4 sm:p-8">
-          <p className="text-center text-base sm:text-lg">
-            Generated content will appear here...<br />
-            Start a conversation with the AI to begin.
-          </p>
+        <div className="flex items-center justify-center h-full text-gray-500 italic p-4 sm:p-8 bg-gray-50/30">
+          <div className="text-center space-y-2">
+            <p className="text-base sm:text-lg font-medium text-gray-600">
+              Content Window
+            </p>
+            <p className="text-sm sm:text-base text-gray-500">
+              Generated content will appear here...<br />
+              Start a conversation with the AI to begin.
+            </p>
+          </div>
         </div>
       );
     }
@@ -32,7 +37,7 @@ export function ContentWindow({ content, onContentChange }: ContentWindowProps) 
 
     return (
       <div 
-        className="prose prose-sm md:prose-base lg:prose-lg max-w-none dark:prose-invert p-4 sm:p-6 md:p-8 overflow-x-hidden"
+        className="prose prose-sm md:prose-base lg:prose-lg max-w-none dark:prose-invert p-4 sm:p-6 md:p-8 overflow-x-hidden bg-white/50"
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     );
